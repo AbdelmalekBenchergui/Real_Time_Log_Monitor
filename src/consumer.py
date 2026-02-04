@@ -6,7 +6,7 @@ from pyspark.sql import SparkSession
 spark = (
     SparkSession.builder
     .appName("LogsConsumer")
-    .master("local[*]")
+    .master("spark://spark-master:7077")
     .config(
         "spark.jars.packages",
         ",".join([
@@ -35,7 +35,7 @@ schema = StructType([
 
 df = spark.readStream \
     .format("kafka") \
-    .option("kafka.bootstrap.servers", "localhost:9092") \
+    .option("kafka.bootstrap.servers", "kafka:9092") \
     .option("subscribe", "logs") \
     .option("startingOffsets", "latest") \
     .load()
@@ -54,11 +54,14 @@ df_json = df_json.withColumn(
 )
 
 
+
 es_options_all_logs = {
-    "es.nodes": "localhost",
+    "es.nodes": "elasticsearch",
     "es.port": "9200",
     "es.resource": "all_logs",
-    "es.mapping.id": "id"
+    "es.mapping.id": "id",
+    "es.nodes.wan.only": "true",      
+    "es.index.auto.create": "true"    
 }
 
 def write_all_logs(df):
@@ -68,8 +71,10 @@ def write_all_logs(df):
       .mode("append") \
       .save()
 
+
 query_all_logs = df_json.writeStream \
     .foreachBatch(lambda df, epochId: write_all_logs(df)) \
+    .option("checkpointLocation", "/opt/airflow/checkpoints/all_logs") \
     .outputMode("append") \
     .start()
 
@@ -77,10 +82,12 @@ query_all_logs = df_json.writeStream \
 alerts = df_json.filter(col("alert_level") == "server errors")
 
 es_options_alerts = {
-    "es.nodes": "localhost",
+    "es.nodes": "elasticsearch",
     "es.port": "9200",
     "es.resource": "alerts",
-    "es.mapping.id": "id"
+    "es.mapping.id": "id" , 
+    "es.nodes.wan.only": "true",      
+    "es.index.auto.create": "true"   
 }
 
 def write_alerts(df):
@@ -92,6 +99,7 @@ def write_alerts(df):
 
 query_alerts = alerts.writeStream \
     .foreachBatch(lambda df, epochId: write_alerts(df)) \
+    .option("checkpointLocation", "/opt/airflow/checkpoints/alerts") \
     .outputMode("append") \
     .start()
 
