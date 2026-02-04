@@ -4,6 +4,9 @@ from datetime import datetime
 from faker import Faker
 from kafka import KafkaProducer
 import json
+from kafka.errors import NoBrokersAvailable
+
+
 
 fake = Faker()
 
@@ -53,10 +56,18 @@ def generate_log():
 
     return var
 
-producer = KafkaProducer(
-    bootstrap_servers="localhost:9092",
-    value_serializer=lambda v: json.dumps(v).encode("utf-8")
-)
+
+while True:
+    try:
+        producer = KafkaProducer(
+            bootstrap_servers='kafka:9092',
+            value_serializer=lambda v: json.dumps(v).encode('utf-8')
+        )
+        print("Kafka is ready!")
+        break
+    except NoBrokersAvailable:
+        print("Kafka not ready, retrying in 5 seconds...")
+        time.sleep(5)
 
 try:
     while True:
