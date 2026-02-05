@@ -216,6 +216,10 @@ __marimo__/
 .streamlit/secrets.toml
 
 
-/venv
-/logs
-.env
+venv/
+logs/
+*.tgz
+*.jar
+*.log
+__pycache__/
+
